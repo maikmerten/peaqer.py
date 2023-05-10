@@ -14,6 +14,8 @@ import subprocess
 import matplotlib.pyplot as plt
 import json
 
+formats = ["o-", "v-", "^-", "<-", ">-", "p-", "h-", "H-", "8-", "o--", "v--", "^--", "<--", ">--", "p--", "h--", "H--", "8--"]
+
 def probe_bitrate(input):
     cmd = "ffprobe -v quiet -print_format json -show_format " + input
     p = subprocess.run(cmd.split(" "), capture_output=True, text=True)
@@ -63,7 +65,8 @@ def run_metric(reference, testfile, metric_settings):
                 score = float(line[start::1])
     return score
 
-def metric_plot(input, settings):
+# plot graphs for a given file
+def plot_file(input, settings):
     metrics_settings = settings["metrics"]
     encoder_settings = settings["encoders"]
     decoder_settings = settings["decoders"]
@@ -71,6 +74,7 @@ def metric_plot(input, settings):
     decfile = "/tmp/decode.wav"
 
     results = {}
+
     for encoder in encoder_settings.keys():
         extension = encoder_settings[encoder]["extension"]
         encode_cmd = encoder_settings[encoder]["cmd"]
@@ -78,6 +82,7 @@ def metric_plot(input, settings):
         decode_cmd = decoder_settings[decoder]["cmd"]
 
         results[encoder] = {}
+
         for metric in metrics_settings.keys():
             results[encoder][metric] = []
 
@@ -93,13 +98,13 @@ def metric_plot(input, settings):
                 score = run_metric(input, decfile, metrics_settings[metric])
                 print("%s: %s for bitrate %d: %f" %(encoder, metrics_settings[metric]["label"], rate, score))
                 score_data = {
-                    "kbps": kbps,
-                    "score": score
+                    "bitrate": rate, # requested bitrate
+                    "kbps": kbps,    # actual bitrate
+                    "score": score   # achieved metric score
                 }
                 results[encoder][metric].append(score_data)
-            print()
 
-    formats = ["o-", "v-", "^-", "<-", ">-", "p-", "h-", "H-", "8-", "o--", "v--", "^--", "<--", ">--", "p--", "h--", "H--", "8--"]
+            print()
 
     for metric in metrics_settings.keys():
         plt.subplots(figsize=(16, 9))
@@ -124,16 +129,62 @@ def metric_plot(input, settings):
         plt.savefig(input + "." + metric + ".svg")
         plt.clf()
 
+    return results
+
+# plot average scores over all files
+def plot_average(all_scores, settings):
+
+    files = all_scores.keys()
+    metrics_settings = settings["metrics"]     
+    bitrates = settings["bitrates"]
+    encoder_settings = settings["encoders"]
+
+    for metric in metrics_settings.keys():
+        enc_averages = {}
+        for encoder in encoder_settings.keys():
+            averages = []
+            for rate in bitrates:
+                score_sum = 0.0
+                for file in files:
+                    for score_data in all_scores[file][encoder][metric]:
+                        if score_data["bitrate"] == rate:
+                            score_sum += score_data["score"]
+                averages.append(score_sum / len(files))
+            enc_averages[encoder] = averages
+        
+
+        plt.subplots(figsize=(16, 9))
+        fmt = 0
+        for encoder in encoder_settings.keys():
+            scores = enc_averages[encoder]
+            plt.plot(bitrates, scores, formats[fmt],label=encoder_settings[encoder]["label"])
+            fmt += 1
+            if fmt >= len(formats):
+                fmt = 0
+
+        plt.title("Average for %d files" % (len(files)))
+        plt.xlabel("Requested bitrate (kbps)")
+        plt.xticks(bitrates)
+        plt.ylabel(metrics_settings[metric]["label"])
+        plt.legend(loc="lower right")
+        plt.grid()
+        plt.savefig("all_files_average." + metric + ".svg")
+        plt.clf()
+
 
 def main():
     settings = {}
     with open("./settings.json") as f:
         settings = json.load(f)
 
+    all_scores = {}
+
     files = os.listdir(".")
     for file in files:
         if file.endswith(".wav"):
-            metric_plot(file, settings)
+            all_scores[file] = plot_file(file, settings)
+
+    plot_average(all_scores, settings)
 
 
 if __name__ == "__main__":
