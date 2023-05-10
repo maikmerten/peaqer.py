@@ -140,30 +140,37 @@ def plot_average(all_scores, settings):
     encoder_settings = settings["encoders"]
 
     for metric in metrics_settings.keys():
-        enc_averages = {}
+        score_averages = {}
+        rate_averages = {}
         for encoder in encoder_settings.keys():
-            averages = []
+            avg_scores = []
+            avg_rates = []
             for rate in bitrates:
                 score_sum = 0.0
+                rate_sum = 0.0
                 for file in files:
                     for score_data in all_scores[file][encoder][metric]:
                         if score_data["bitrate"] == rate:
                             score_sum += score_data["score"]
-                averages.append(score_sum / len(files))
-            enc_averages[encoder] = averages
+                            rate_sum += score_data["kbps"]
+                avg_scores.append(score_sum / len(files))
+                avg_rates.append(rate_sum / len(files))
+            score_averages[encoder] = avg_scores
+            rate_averages[encoder] = avg_rates
         
 
         plt.subplots(figsize=(16, 9))
         fmt = 0
         for encoder in encoder_settings.keys():
-            scores = enc_averages[encoder]
-            plt.plot(bitrates, scores, formats[fmt],label=encoder_settings[encoder]["label"])
+            rates = rate_averages[encoder]
+            scores = score_averages[encoder]
+            plt.plot(rates, scores, formats[fmt],label=encoder_settings[encoder]["label"])
             fmt += 1
             if fmt >= len(formats):
                 fmt = 0
 
         plt.title("Average for %d files" % (len(files)))
-        plt.xlabel("Requested bitrate (kbps)")
+        plt.xlabel("Average bitrate (kbps)")
         plt.xticks(bitrates)
         plt.ylabel(metrics_settings[metric]["label"])
         plt.legend(loc="lower right")
