@@ -1,0 +1,75 @@
+{
+    "bitrates": [64, 96, 128, 160, 192, 224, 256],
+    "metrics": {
+        "peaq_adv": {
+            "cmd": "peaq $REFERENCE $TESTFILE --advanced --gst-plugin-path /usr/lib/gstreamer-1.0",
+            "prefix": "Objective Difference Grade:",
+            "label": "Objective Difference Grade (advanced)"
+        }, 
+        "asdr": {
+            "cmd": "ffmpeg -i $REFERENCE -i $TESTFILE -lavfi asdr -f null -",
+            "out": "stderr",
+            "prefix": "SDR ch0: ",
+            "suffix": "dB",
+            "label": "SDR ch0"
+        }
+    },
+    "encoders": {
+        "opusenc": {
+            "label": "opusenc (libopus 1.3.1)",
+            "cmd": "opusenc --quiet --bitrate $KBPS $INPUT $OUTPUT",
+            "extension": "opus",
+            "decoder": "opusdec"
+        },
+        "qaac": {
+            "label": "qaac 2.79, CoreAudioToolbox 7.10.9.0, ABR, AAC-LC",
+            "cmd": "wine /opt/qaac/qaac64.exe --abr $KBPS -o $OUTPUT $INPUT",
+            "extension": "m4a",
+            "decoder": "ffmpeg"
+        },
+        "fdkaac": {
+            "label": "fdkaac (libfdk-aac2 2.0.2), AAC-LC",
+            "cmd": "fdkaac --silent -b $BPS $INPUT -o $OUTPUT",
+            "extension": "m4a",
+            "decoder": "ffmpeg"
+        },
+        "lame-abr": {
+            "label": "lame 3.100 (ABR)",
+            "cmd": "lame --quiet --resample 44100 -h --abr $KBPS $INPUT $OUTPUT",
+            "extension": "mp3",
+            "decoder": "ffmpeg"
+        },
+        "faac": {
+            "label": "faac 1.30, AAC-LC",
+            "cmd": "faac -v0 --overwrite -b $KBPS -o $OUTPUT $INPUT",
+            "extension": "m4a",
+            "decoder": "ffmpeg"
+        },
+        "ffmpeg-aac-ubuntu": {
+            "label": "ffmpeg-aac (4.4.2-ubuntu), AAC-LC",
+            "cmd": "/usr/bin/ffmpeg -v error -y -i $INPUT -b:a $BPS $OUTPUT",
+            "extension": "m4a",
+            "decoder": "ffmpeg"
+        },
+        "ffmpeg-aac-git": {
+            "label": "ffmpeg-aac (git), AAC-LC",
+            "cmd": "/usr/local/bin/ffmpeg -v error -y -i $INPUT -b:a $BPS $OUTPUT",
+            "extension": "m4a",
+            "decoder": "ffmpeg"
+        },
+        "ffmpeg-opus-git": {
+            "label": "ffmpeg-opus (git), Opus (not libopus)",
+            "cmd": "/usr/local/bin/ffmpeg -v error -y -i $INPUT -b:a $BPS -acodec opus -strict -2 $OUTPUT",
+            "extension": "opus",
+            "decoder": "ffmpeg"
+        }
+    },
+    "decoders": {
+        "ffmpeg": {
+            "cmd": "ffmpeg -v error -i $INPUT -bitexact -f wav -y $OUTPUT"
+        },
+        "opusdec": {
+            "cmd": "opusdec --quiet $INPUT $OUTPUT"
+        }
+    }
+}
