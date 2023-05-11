@@ -115,7 +115,7 @@ def plot_file(input, settings):
             for score_data in results[encoder][metric]:
                 rates.append(score_data["kbps"])
                 scores.append(score_data["score"])
-            plt.plot(rates, scores, formats[fmt],label=encoder_settings[encoder]["label"])
+            plt.plot(rates, scores, formats[fmt], label=encoder_settings[encoder]["label"], gid="encoder_"+ encoder)
             fmt += 1
             if fmt >= len(formats):
                 fmt = 0
@@ -164,7 +164,7 @@ def plot_average(all_scores, settings):
         for encoder in encoder_settings.keys():
             rates = rate_averages[encoder]
             scores = score_averages[encoder]
-            plt.plot(rates, scores, formats[fmt],label=encoder_settings[encoder]["label"])
+            plt.plot(rates, scores, formats[fmt], label=encoder_settings[encoder]["label"], gid="encoder_"+ encoder)
             fmt += 1
             if fmt >= len(formats):
                 fmt = 0
