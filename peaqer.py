@@ -14,8 +14,6 @@ import subprocess
 import matplotlib.pyplot as plt
 import json
 
-formats = ["o-", "v-", "^-", "<-", ">-", "p-", "h-", "H-", "8-", "o--", "v--", "^--", "<--", ">--", "p--", "h--", "H--", "8--"]
-
 def probe_bitrate(input):
     cmd = "ffprobe -v quiet -print_format json -show_format " + input
     p = subprocess.run(cmd.split(" "), capture_output=True, text=True)
@@ -65,8 +63,24 @@ def run_metric(reference, testfile, metric_settings):
                 score = float(line[start::1])
     return score
 
+def get_plot_format(fmt=0):
+    formats = ["o-", "v-", "^-", "<-", ">-", "p-", "h-", "H-", "8-", "o--", "v--", "^--", "<--", ">--", "p--", "h--", "H--", "8--"]
+    return formats[fmt % len(formats)]
+
+def save_plot(file, title, xticks, xlabel, ylabel):
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.xticks(xticks)
+    plt.ylabel(ylabel)
+    plt.legend(loc="lower right")
+    plt.grid()
+    plt.savefig(file)
+    plt.clf()
+    return file
+
+
 # plot graphs for a given file
-def plot_file(input, settings):
+def plot_file(input, plotfiles, settings):
     metrics_settings = settings["metrics"]
     encoder_settings = settings["encoders"]
     decoder_settings = settings["decoders"]
@@ -115,24 +129,17 @@ def plot_file(input, settings):
             for score_data in results[encoder][metric]:
                 rates.append(score_data["kbps"])
                 scores.append(score_data["score"])
-            plt.plot(rates, scores, formats[fmt], label=encoder_settings[encoder]["label"], gid="encoder_"+ encoder)
+            plt.plot(rates, scores, get_plot_format(fmt), label=encoder_settings[encoder]["label"], gid="encoder_"+ encoder)
             fmt += 1
-            if fmt >= len(formats):
-                fmt = 0
 
-        plt.title(input)
-        plt.xlabel("Bitrate (kbps)")
-        plt.xticks(bitrates)
-        plt.ylabel(metrics_settings[metric]["label"])
-        plt.legend(loc="lower right")
-        plt.grid()
-        plt.savefig(input + "." + metric + ".svg")
-        plt.clf()
+        plotfile = save_plot(file=input + "." + metric + ".svg", title=input, xticks=bitrates,
+                             xlabel="Bitrate (kbps)", ylabel=metrics_settings[metric]["label"])
+        plotfiles.append(plotfile)
 
     return results
 
 # plot average scores over all files
-def plot_average(all_scores, settings):
+def plot_average(all_scores, plotfiles, settings):
 
     files = all_scores.keys()
     metrics_settings = settings["metrics"]     
@@ -164,19 +171,12 @@ def plot_average(all_scores, settings):
         for encoder in encoder_settings.keys():
             rates = rate_averages[encoder]
             scores = score_averages[encoder]
-            plt.plot(rates, scores, formats[fmt], label=encoder_settings[encoder]["label"], gid="encoder_"+ encoder)
+            plt.plot(rates, scores, get_plot_format(fmt), label=encoder_settings[encoder]["label"], gid="encoder_"+ encoder)
             fmt += 1
-            if fmt >= len(formats):
-                fmt = 0
 
-        plt.title("Average for %d files" % (len(files)))
-        plt.xlabel("Average bitrate (kbps)")
-        plt.xticks(bitrates)
-        plt.ylabel(metrics_settings[metric]["label"])
-        plt.legend(loc="lower right")
-        plt.grid()
-        plt.savefig("all_files_average." + metric + ".svg")
-        plt.clf()
+        plotfile = save_plot(file="all_files_average." + metric + ".svg", title="Average for %d files" % (len(files)),
+                             xticks=bitrates, xlabel="Average bitrate (kbps)", ylabel=metrics_settings[metric]["label"])
+        plotfiles.append(plotfile)
 
 
 def main():
@@ -185,13 +185,26 @@ def main():
         settings = json.load(f)
 
     all_scores = {}
+    plotfiles_files = []
+    plotfiles_avg = []
 
     files = os.listdir(".")
+    files.sort()
     for file in files:
         if file.endswith(".wav"):
-            all_scores[file] = plot_file(file, settings)
+            all_scores[file] = plot_file(file, plotfiles_files, settings)
+    
+    plot_average(all_scores, plotfiles_avg, settings)
 
-    plot_average(all_scores, settings)
+
+    all_results = {}
+    all_results["plotfiles"] = plotfiles_avg + plotfiles_files
+    all_results["settings"] = settings
+    all_results["results"] = all_scores
+
+    with open("all_results.json", "w") as outfile:
+        outfile.write(json.dumps(all_results))
+
 
 
 if __name__ == "__main__":
