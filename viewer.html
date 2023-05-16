@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>peaqer.py viewer</title>
+
+    <style>
+        body {
+            font-family: sans-serif;
+        }
+
+        div#container {
+            display: grid;
+            grid-template-columns: auto;
+        }
+
+        div#uidiv {
+            margin-top: 0em;
+        }
+
+        select#plotselect {
+            font-size: large;
+        }
+
+        @media only screen and (min-width: 1200px) {
+            div#container {
+                grid-template-columns: auto 400px;
+            }
+            div#uidiv {
+                margin-top: 4em;
+            }
+        }
+
+    </style>
+
+</head>
+<body>
+    <div id="container">
+        <div id="plotdiv">
+            <object type="image/svg+xml" id="plot" width="100%" height="100%"></object>
+        </div>
+
+        <div id="uidiv">
+            <select id="plotselect"></select>
+            <br><br>
+            <table id="enctable"></table>
+        </div>
+    </div>
+
+    <script>
+        window.addEventListener("DOMContentLoaded", () => {
+
+            let all_results = null
+
+            function showEncoder(encoder, visible) {
+                plotdoc = document.querySelector("object#plot").contentDocument
+                let groups = plotdoc.querySelectorAll("g#encoder_" + encoder)
+                for(let group of groups) {
+                    group.setAttribute("style", visible ? "visibility:initial" : "visibility:hidden")
+                }
+            }
+
+            function buildEncoderTable() {
+                const table = document.querySelector("table#enctable")
+                table.innerHTML = ""
+
+                let tr = document.createElement("tr")
+                tr.innerHTML = "<th>Show</th><th>Encoder</th>"
+                table.append(tr)
+
+                let encoders = all_results.settings.encoders
+                for(const key in encoders) {
+                    const encoder = encoders[key]
+
+                    tr = document.createElement("tr")
+                    table.append(tr)
+
+                    let td = document.createElement("td")
+                    tr.append(td)
+                    let checkbox = document.createElement("input")
+                    checkbox.type = "checkbox"
+                    checkbox.checked = true
+                    checkbox.addEventListener("change", (evt) => {
+                        showEncoder(key, checkbox.checked)
+                    })
+                    td.append(checkbox)
+
+                    td = document.createElement("td")
+                    tr.append(td)
+                    td.innerText = encoder.label
+                }
+
+            }
+
+            function loadPlot(src) {
+                console.log(src)
+                document.querySelector("object#plot").setAttribute("data" , src)
+                buildEncoderTable()
+            }
+
+
+            (function init() {
+                const req = new XMLHttpRequest();
+                req.open("GET", "all_results.json");
+                req.addEventListener("load", function() {
+                    all_results = JSON.parse(req.responseText)
+
+                    const select = document.querySelector("select#plotselect")
+                    for(let file of all_results.plotfiles) {
+                        const option = document.createElement("option")
+                        option.text = file
+                        option.value = file
+                        select.append(option)
+                    }
+                    select.addEventListener("change", (evt) => {
+                        loadPlot(evt.target.value)
+                    })
+
+                    loadPlot(all_results.plotfiles[0])
+                });
+                req.send();
+
+                document.querySelector("select#plotselect").focus()
+            })();
+
+        })
+    </script>
+</body>
+</html>
