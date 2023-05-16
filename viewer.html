@@ -29,7 +29,7 @@
                 grid-template-columns: auto 400px;
             }
             div#uidiv {
-                margin-top: 4em;
+                margin-top: 1em;
             }
         }
 
@@ -43,9 +43,12 @@
         </div>
 
         <div id="uidiv">
-            <select id="plotselect"></select>
+            <select id="plotselect" size="10"></select>
             <br><br>
-            <table id="enctable"></table>
+            <div id="encoders"></div>
+            <br>
+            <button id="hideall">Hide All</button>
+            <button id="showall">Show All</button>
         </div>
     </div>
 
@@ -53,50 +56,57 @@
         window.addEventListener("DOMContentLoaded", () => {
 
             let all_results = null
+            let checkboxes = {}
+            let plot = document.querySelector("object#plot")
 
-            function showEncoder(encoder, visible) {
-                plotdoc = document.querySelector("object#plot").contentDocument
-                let groups = plotdoc.querySelectorAll("g#encoder_" + encoder)
-                for(let group of groups) {
-                    group.setAttribute("style", visible ? "visibility:initial" : "visibility:hidden")
+            function updateVisibilities() {
+                function showEncoder(encoder, visible) {
+                    let groups = plot.contentDocument.querySelectorAll("g#encoder_" + encoder)
+                    for(let group of groups) {
+                        group.setAttribute("style", visible ? "visibility:initial" : "visibility:hidden")
+                    }
+                }
+
+                for(let encoder in checkboxes) {
+                    showEncoder(encoder, checkboxes[encoder].checked)
                 }
             }
 
-            function buildEncoderTable() {
-                const table = document.querySelector("table#enctable")
-                table.innerHTML = ""
+            function hideOrShowAll(visible) {
+                for(let encoder in checkboxes) {
+                    checkboxes[encoder].checked = visible
+                }
+                updateVisibilities()
+            }
 
-                let tr = document.createElement("tr")
-                tr.innerHTML = "<th>Show</th><th>Encoder</th>"
-                table.append(tr)
+            function buildEncoderSelects() {
+                const encdiv = document.querySelector("div#encoders")
 
                 let encoders = all_results.settings.encoders
                 for(const key in encoders) {
                     const encoder = encoders[key]
 
-                    tr = document.createElement("tr")
-                    table.append(tr)
-
-                    let td = document.createElement("td")
-                    tr.append(td)
                     let checkbox = document.createElement("input")
                     checkbox.type = "checkbox"
+                    checkbox.id = key
                     checkbox.checked = true
+                    checkboxes[key] = checkbox
                     checkbox.addEventListener("change", (evt) => {
-                        showEncoder(key, checkbox.checked)
+                        updateVisibilities()
                     })
-                    td.append(checkbox)
 
-                    td = document.createElement("td")
-                    tr.append(td)
-                    td.innerText = encoder.label
+                    let label = document.createElement("label")
+                    label.innerText = encoder.label
+                    label.setAttribute("for", key)
+
+                    encdiv.append(checkbox)
+                    encdiv.append(label)
+                    encdiv.append(document.createElement("br"))
                 }
-
             }
 
             function loadPlot(src) {
-                document.querySelector("object#plot").setAttribute("data" , src)
-                buildEncoderTable()
+                plot.data = src
             }
 
 
@@ -117,11 +127,25 @@
                         loadPlot(evt.target.value)
                     })
 
+                    buildEncoderSelects()
+
+                    plot.addEventListener("load", () => {
+                        updateVisibilities()
+                    })
+
                     loadPlot(all_results.plotfiles[0])
                 });
                 req.send();
 
                 document.querySelector("select#plotselect").focus()
+
+                document.querySelector("button#hideall").addEventListener("click", () => {
+                    hideOrShowAll(false)
+                })
+
+                document.querySelector("button#showall").addEventListener("click", () => {
+                    hideOrShowAll(true)
+                })
             })();
 
         })
