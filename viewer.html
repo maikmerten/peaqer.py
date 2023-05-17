@@ -20,13 +20,13 @@
             margin-top: 0em;
         }
 
-        select#plotselect {
-            font-size: large;
+        select#fileselect {
+            width: 100%;
         }
 
-        @media only screen and (min-width: 1200px) {
+        @media only screen and (min-width: 1250px) {
             div#container {
-                grid-template-columns: auto 400px;
+                grid-template-columns: auto 480px;
             }
             div#uidiv {
                 margin-top: 1em;
@@ -43,12 +43,23 @@
         </div>
 
         <div id="uidiv">
-            <select id="plotselect" size="10"></select>
-            <br><br>
-            <div id="encoders"></div>
+            <fieldset>
+                <legend>Metrics</legend>
+                <div id="metrics"></div>
+            </fieldset>
             <br>
-            <button id="hideall">Hide All</button>
-            <button id="showall">Show All</button>
+            <fieldset>
+                <legend>Sample files</legend>
+                <select id="fileselect" size="10"></select>
+            </fieldset>
+            <br>
+            <fieldset>
+                <legend>Encoders</legend>
+                <div id="encoders"></div>
+                <br>
+                <button id="hideall">Hide All</button>
+                <button id="showall">Show All</button>
+            </fieldset>
         </div>
     </div>
 
@@ -58,6 +69,12 @@
             let all_results = null
             let checkboxes = {}
             let plot = document.querySelector("object#plot")
+
+            function loadPlot() {
+                let metric = document.querySelector("input[name='metrics']:checked").value
+                let file = document.querySelector("select#fileselect").value
+                plot.data = file + "." + metric + ".svg"
+            }
 
             function updateVisibilities() {
                 function showEncoder(encoder, visible) {
@@ -77,6 +94,53 @@
                     checkboxes[encoder].checked = visible
                 }
                 updateVisibilities()
+            }
+
+            function buildMetricsSelects() {
+                const metricsdiv = document.querySelector("div#metrics")
+
+                let first = true
+                let metrics = all_results.settings.metrics
+                for(metric in metrics) {
+                    const input = document.createElement("input")
+                    input.type = "radio"
+                    input.id = "metrics-" + metric
+                    input.name = "metrics"
+                    input.value = metric
+                    input.checked = first
+                    first = false
+
+                    input.addEventListener("change", loadPlot)
+
+                    const label = document.createElement("label")
+                    label.innerText = metric
+                    label.setAttribute("for", "metrics-" + metric)
+
+                    metricsdiv.append(input)
+                    metricsdiv.append(label)
+                    metricsdiv.append(document.createElement("br"))
+                }
+            }
+
+            function buildFileSelects() {
+                const select = document.querySelector("select#fileselect")
+
+                let files = ["all_files_average"]
+                for(let file in all_results.results) {
+                    files.push(file)
+                }
+
+                for(let file of files) {
+                    const option = document.createElement("option")
+                    option.text = file
+                    option.value = file
+                    if(file == "all_files_average") {
+                        option.text = "All files average"
+                        option.selected = true
+                    }
+                    select.append(option)
+                }
+                select.addEventListener("change", loadPlot)
             }
 
             function buildEncoderSelects() {
@@ -105,10 +169,6 @@
                 }
             }
 
-            function loadPlot(src) {
-                plot.data = src
-            }
-
 
             (function init() {
                 const req = new XMLHttpRequest();
@@ -116,28 +176,19 @@
                 req.addEventListener("load", function() {
                     all_results = JSON.parse(req.responseText)
 
-                    const select = document.querySelector("select#plotselect")
-                    for(let file of all_results.plotfiles) {
-                        const option = document.createElement("option")
-                        option.text = file
-                        option.value = file
-                        select.append(option)
-                    }
-                    select.addEventListener("change", (evt) => {
-                        loadPlot(evt.target.value)
-                    })
-
+                    buildFileSelects()
+                    buildMetricsSelects()
                     buildEncoderSelects()
 
                     plot.addEventListener("load", () => {
                         updateVisibilities()
                     })
 
-                    loadPlot(all_results.plotfiles[0])
+                    loadPlot()
                 });
                 req.send();
 
-                document.querySelector("select#plotselect").focus()
+                document.querySelector("select#fileselect").focus()
 
                 document.querySelector("button#hideall").addEventListener("click", () => {
                     hideOrShowAll(false)
