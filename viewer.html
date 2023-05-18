@@ -70,41 +70,42 @@
             let checkboxes = {}
             let plot = document.querySelector("object#plot")
 
-            function getSettings() {
-                let settings = {}
-                settings.metric = document.querySelector("input[name='metrics']:checked").value
-                settings.file = document.querySelector("select#fileselect").value
-                settings.visibilities = {}
+            function getConfig() {
+                let config = {}
+                config.metric = document.querySelector("input[name='metrics']:checked").value
+                config.file = document.querySelector("select#fileselect").value
+                config.vis = []
                 for(let encoder in checkboxes) {
-                    settings.visibilities[encoder] = checkboxes[encoder].checked
+                    config.vis.push(checkboxes[encoder].checked ? 1 : 0)
                 }
 
                 let href = window.location.href.split("?")[0]
-                window.history.replaceState(null, null, href + "?s=" + encodeURIComponent(JSON.stringify(settings)))
+                window.history.replaceState(null, null, href + "?c=" + encodeURIComponent(JSON.stringify(config)))
 
-                return settings
+                return config
             }
 
-            function loadSettings() {
-                let tokens = window.location.href.split("?s=")
+            function loadConfig() {
+                let tokens = window.location.href.split("?c=")
                 if(tokens.length != 2) {
                     return
                 }
-                let settings = JSON.parse(decodeURIComponent(tokens[1]))
+                let config = JSON.parse(decodeURIComponent(tokens[1]))
                 
-                document.querySelector("input#metrics-" + settings.metric).checked = true
-                document.querySelector("option[value='" + settings.file + "']").selected = true
+                document.querySelector("input#metrics-" + config.metric).checked = true
+                document.querySelector("option[value='" + config.file + "']").selected = true
 
-                for(encoder in settings.visibilities) {
-                    let visible = settings.visibilities[encoder]
-                    document.querySelector("input#" + encoder).checked = visible
+                let idx = 0;
+                for(encoder in checkboxes) {
+                    let visible = config.vis[encoder]
+                    document.querySelector("input#" + encoder).checked = (config.vis[idx++] != 0)
                 }
             }
 
 
             function loadPlot() {
-                let settings = getSettings()
-                plot.data = settings.file + "." + settings.metric + ".svg"
+                let config = getConfig()
+                plot.data = config.file + "." + config.metric + ".svg"
             }
 
             function updateVisibilities() {
@@ -115,9 +116,10 @@
                     }
                 }
 
-                let settings = getSettings()
-                for(let encoder in settings.visibilities) {
-                    showEncoder(encoder, settings.visibilities[encoder])
+                let config = getConfig()
+                let idx = 0
+                for(let encoder in checkboxes) {
+                    showEncoder(encoder, config.vis[idx++] != 0)
                 }
             }
 
@@ -211,7 +213,7 @@
                     buildFileSelects()
                     buildMetricsSelects()
                     buildEncoderSelects()
-                    loadSettings()
+                    loadConfig()
 
                     plot.addEventListener("load", () => {
                         updateVisibilities()
