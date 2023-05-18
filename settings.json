@@ -16,10 +16,16 @@
     },
     "encoders": {
         "opusenc": {
-            "label": "opusenc (libopus 1.3.1)",
+            "label": "opusenc (libopus 1.3.1), Opus",
             "cmd": "opusenc --quiet --bitrate $KBPS $INPUT $OUTPUT",
             "extension": "opus",
             "decoder": "opusdec"
+        },
+        "oggenc": {
+            "label": "oggenc (libvorbis 1.3.7), Vorbis",
+            "cmd": "oggenc -Q -b $KBPS $INPUT -o $OUTPUT",
+            "extension": "oga",
+            "decoder": "ffmpeg"
         },
         "qaac": {
             "label": "qaac 2.79, CoreAudioToolbox 7.10.9.0, ABR, AAC-LC",
