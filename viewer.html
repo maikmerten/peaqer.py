@@ -97,7 +97,6 @@
 
                 let idx = 0;
                 for(encoder in checkboxes) {
-                    let visible = config.vis[encoder]
                     document.querySelector("input#" + encoder).checked = (config.vis[idx++] != 0)
                 }
             }
