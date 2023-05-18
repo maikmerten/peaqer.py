@@ -70,10 +70,41 @@
             let checkboxes = {}
             let plot = document.querySelector("object#plot")
 
+            function getSettings() {
+                let settings = {}
+                settings.metric = document.querySelector("input[name='metrics']:checked").value
+                settings.file = document.querySelector("select#fileselect").value
+                settings.visibilities = {}
+                for(let encoder in checkboxes) {
+                    settings.visibilities[encoder] = checkboxes[encoder].checked
+                }
+
+                let href = window.location.href.split("?")[0]
+                window.history.replaceState(null, null, href + "?s=" + encodeURIComponent(JSON.stringify(settings)))
+
+                return settings
+            }
+
+            function loadSettings() {
+                let tokens = window.location.href.split("?s=")
+                if(tokens.length != 2) {
+                    return
+                }
+                let settings = JSON.parse(decodeURIComponent(tokens[1]))
+                
+                document.querySelector("input#metrics-" + settings.metric).checked = true
+                document.querySelector("option[value='" + settings.file + "']").selected = true
+
+                for(encoder in settings.visibilities) {
+                    let visible = settings.visibilities[encoder]
+                    document.querySelector("input#" + encoder).checked = visible
+                }
+            }
+
+
             function loadPlot() {
-                let metric = document.querySelector("input[name='metrics']:checked").value
-                let file = document.querySelector("select#fileselect").value
-                plot.data = file + "." + metric + ".svg"
+                let settings = getSettings()
+                plot.data = settings.file + "." + settings.metric + ".svg"
             }
 
             function updateVisibilities() {
@@ -84,8 +115,9 @@
                     }
                 }
 
-                for(let encoder in checkboxes) {
-                    showEncoder(encoder, checkboxes[encoder].checked)
+                let settings = getSettings()
+                for(let encoder in settings.visibilities) {
+                    showEncoder(encoder, settings.visibilities[encoder])
                 }
             }
 
@@ -179,11 +211,11 @@
                     buildFileSelects()
                     buildMetricsSelects()
                     buildEncoderSelects()
+                    loadSettings()
 
                     plot.addEventListener("load", () => {
                         updateVisibilities()
                     })
-
                     loadPlot()
                 });
                 req.send();
