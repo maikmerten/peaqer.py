@@ -13,6 +13,7 @@ import os
 import subprocess
 import matplotlib.pyplot as plt
 import json
+from threading import Thread
 
 def probe_bitrate(input):
     cmd = "ffprobe -v quiet -print_format json -show_format " + input
@@ -27,7 +28,7 @@ def decode(cmd, input, output):
     cmd = cmd.replace("$INPUT", input)
     cmd = cmd.replace("$OUTPUT", output)
     print("executing " + cmd)
-    subprocess.run(cmd.split(" "))
+    subprocess.run(cmd.split(" "), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def encode(cmd, input, output, bitrate):
     cmd = cmd.replace("$BPS", str(bitrate * 1000))
@@ -35,7 +36,7 @@ def encode(cmd, input, output, bitrate):
     cmd = cmd.replace("$INPUT", input)
     cmd = cmd.replace("$OUTPUT", output)
     print("executing " + cmd)
-    subprocess.run(cmd.split(" "))
+    subprocess.run(cmd.split(" "), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def run_metric(reference, testfile, metric_settings):
     cmd = metric_settings["cmd"]
@@ -78,8 +79,28 @@ def save_plot(file, title, xticks, xlabel, ylabel):
     plt.clf()
 
 
-# plot graphs for a given file
-def plot_file(input, threadid, settings):
+def create_file_plot(file, results, settings):
+    metrics_settings = settings["metrics"]
+    encoder_settings = settings["encoders"]
+    bitrates = settings["bitrates"]
+
+    for metric in metrics_settings.keys():
+        plt.subplots(figsize=(16, 9))
+        fmt = 0
+        for encoder in encoder_settings.keys():
+            rates = []
+            scores = []
+            for score_data in results[encoder][metric]:
+                rates.append(score_data["kbps"])
+                scores.append(score_data["score"])
+            plt.plot(rates, scores, get_plot_format(fmt), label=encoder_settings[encoder]["label"], gid="encoder_"+ encoder)
+            fmt += 1
+
+        save_plot(file=file + "." + metric + ".svg", title=file, xticks=bitrates, xlabel="Bitrate (kbps)", ylabel=metrics_settings[metric]["label"])
+
+
+# create metric data for provided file
+def measure_file(input, threadid, settings):
     metrics_settings = settings["metrics"]
     encoder_settings = settings["encoders"]
     decoder_settings = settings["decoders"]
@@ -122,21 +143,8 @@ def plot_file(input, threadid, settings):
 
             print()
 
-    for metric in metrics_settings.keys():
-        plt.subplots(figsize=(16, 9))
-        fmt = 0
-        for encoder in encoder_settings.keys():
-            rates = []
-            scores = []
-            for score_data in results[encoder][metric]:
-                rates.append(score_data["kbps"])
-                scores.append(score_data["score"])
-            plt.plot(rates, scores, get_plot_format(fmt), label=encoder_settings[encoder]["label"], gid="encoder_"+ encoder)
-            fmt += 1
-
-        save_plot(file=input + "." + metric + ".svg", title=input, xticks=bitrates, xlabel="Bitrate (kbps)", ylabel=metrics_settings[metric]["label"])
-
     return results
+
 
 # plot average scores over all files
 def plot_average(all_scores, settings):
@@ -178,24 +186,69 @@ def plot_average(all_scores, settings):
         title = "Average for %d files" % (len(files))
         save_plot(file=file, title=title, xticks=bitrates, xlabel="Average bitrate (kbps)", ylabel=metrics_settings[metric]["label"])
 
-
+class PlotThread(Thread):
+    def __init__(self, id, files, settings):
+        Thread.__init__(self)
+        self.id = id
+        self.files = files
+        self.settings = settings
+        self.results = {}
+    
+    def run(self):
+        for file in self.files:
+            self.results[file] = measure_file(file, self.id, self.settings)
+            
 
 def main():
     settings = {}
     with open("./settings.json") as f:
         settings = json.load(f)
 
-    all_scores = {}
-
-    files = os.listdir(".")
+    files = list(filter(lambda file: file.endswith(".wav"), os.listdir(".")))
     files.sort()
+
+    # use half of the hardware threads available
+    threads = os.cpu_count() >> 1
+    if threads < 1: threads = 1
+    threadlist = []
+    threadfiles = []
+    for i in range(0, threads):
+        threadfiles.append([])
+
+    # distribute files to threads
+    idx = 0
     for file in files:
-        if file.endswith(".wav"):
-            all_scores[file] = plot_file(file, 0, settings)
+        threadfiles[idx % threads].append(file)
+        idx += 1
     
+    # create and start threads
+    for i in range(0, threads):
+        thread = PlotThread(i, threadfiles[i], settings)
+        thread.start()
+        threadlist.append(thread)
+
+    # assemble results
+    threadscores = {}
+    for thread in threadlist:
+        thread.join()
+        for file in thread.results.keys():
+            threadscores[file] = thread.results[file]
+
+    # put results into file order
+    all_scores = {}
+    for file in files:
+        all_scores[file] = threadscores[file]
+   
+
+    # create plots for all files
+    for file in all_scores.keys():
+        create_file_plot(file, all_scores[file], settings)
+
+    # plot average    
     plot_average(all_scores, settings)
 
 
+    # write all results to JSON file
     all_results = {}
     all_results["settings"] = settings
     all_results["results"] = all_scores
