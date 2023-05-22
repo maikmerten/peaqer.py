@@ -76,16 +76,15 @@ def save_plot(file, title, xticks, xlabel, ylabel):
     plt.grid()
     plt.savefig(file)
     plt.clf()
-    return file
 
 
 # plot graphs for a given file
-def plot_file(input, plotfiles, settings):
+def plot_file(input, threadid, settings):
     metrics_settings = settings["metrics"]
     encoder_settings = settings["encoders"]
     decoder_settings = settings["decoders"]
     bitrates = settings["bitrates"]
-    decfile = "/tmp/decode.wav"
+    decfile = "/tmp/decode-" + str(threadid) + ".wav"
 
     results = {}
 
@@ -101,7 +100,7 @@ def plot_file(input, plotfiles, settings):
             results[encoder][metric] = []
 
         for rate in bitrates:
-            encfile = "/tmp/test." + extension
+            encfile = "/tmp/encode-" + str(threadid) + "." + extension
             encode(encode_cmd, input, encfile, rate)
             kbps = probe_bitrate(encfile)
             print("Actual bitrate: %f" % (kbps))
@@ -118,6 +117,9 @@ def plot_file(input, plotfiles, settings):
                 }
                 results[encoder][metric].append(score_data)
 
+            os.remove(encfile)
+            os.remove(decfile)
+
             print()
 
     for metric in metrics_settings.keys():
@@ -132,14 +134,12 @@ def plot_file(input, plotfiles, settings):
             plt.plot(rates, scores, get_plot_format(fmt), label=encoder_settings[encoder]["label"], gid="encoder_"+ encoder)
             fmt += 1
 
-        plotfile = save_plot(file=input + "." + metric + ".svg", title=input, xticks=bitrates,
-                             xlabel="Bitrate (kbps)", ylabel=metrics_settings[metric]["label"])
-        plotfiles.append(plotfile)
+        save_plot(file=input + "." + metric + ".svg", title=input, xticks=bitrates, xlabel="Bitrate (kbps)", ylabel=metrics_settings[metric]["label"])
 
     return results
 
 # plot average scores over all files
-def plot_average(all_scores, plotfiles, settings):
+def plot_average(all_scores, settings):
 
     files = all_scores.keys()
     metrics_settings = settings["metrics"]     
@@ -174,9 +174,10 @@ def plot_average(all_scores, plotfiles, settings):
             plt.plot(rates, scores, get_plot_format(fmt), label=encoder_settings[encoder]["label"], gid="encoder_"+ encoder)
             fmt += 1
 
-        plotfile = save_plot(file="all_files_average." + metric + ".svg", title="Average for %d files" % (len(files)),
-                             xticks=bitrates, xlabel="Average bitrate (kbps)", ylabel=metrics_settings[metric]["label"])
-        plotfiles.append(plotfile)
+        file = "all_files_average." + metric + ".svg"
+        title = "Average for %d files" % (len(files))
+        save_plot(file=file, title=title, xticks=bitrates, xlabel="Average bitrate (kbps)", ylabel=metrics_settings[metric]["label"])
+
 
 
 def main():
@@ -185,20 +186,17 @@ def main():
         settings = json.load(f)
 
     all_scores = {}
-    plotfiles_files = []
-    plotfiles_avg = []
 
     files = os.listdir(".")
     files.sort()
     for file in files:
         if file.endswith(".wav"):
-            all_scores[file] = plot_file(file, plotfiles_files, settings)
+            all_scores[file] = plot_file(file, 0, settings)
     
-    plot_average(all_scores, plotfiles_avg, settings)
+    plot_average(all_scores, settings)
 
 
     all_results = {}
-    all_results["plotfiles"] = plotfiles_avg + plotfiles_files
     all_results["settings"] = settings
     all_results["results"] = all_scores
 
